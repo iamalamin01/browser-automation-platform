@@ -1,5 +1,6 @@
 import { Queue } from 'bullmq';
-import { createBullBoard as createBoard, BullMQAdapter } from '@bull-board/api';
+import { createBullBoard as initBullBoard } from '@bull-board/api';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import redis from './redis';
 
@@ -19,7 +20,7 @@ export const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath('/admin/queues');
 
 export function createBullBoard() {
-  createBoard({
+  initBullBoard({
     queues: [new BullMQAdapter(automationQueue)],
     serverAdapter,
   });
