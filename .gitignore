@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Environment variables (keep examples, not actuals)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+!.env.local.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Uploads / Screenshots
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Prisma
+backend/prisma/migrations/
+
+# TypeScript
+*.tsbuildinfo

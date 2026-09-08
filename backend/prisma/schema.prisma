@@ -1,0 +1,321 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+// System Users (dashboard login)
+// ─────────────────────────────────────────
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String
+  role         UserRole @default(TESTER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  automationTasks AutomationTask[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  TESTER
+  VIEWER
+}
+
+// ─────────────────────────────────────────
+// Browser Profiles
+// ─────────────────────────────────────────
+model BrowserProfile {
+  id          String        @id @default(uuid())
+  profileId   String        @unique // profile_001, profile_002, ...
+  name        String
+  browserType BrowserType   @default(CHROMIUM)
+  userAgent   String?
+  cookies     Json?
+  localStorage Json?
+  sessionData Json?
+  status      ProfileStatus @default(READY)
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  testUser        TestUser?        @relation(fields: [testUserId], references: [id])
+  testUserId      String?
+  automationTasks AutomationTask[]
+
+  @@map("browser_profiles")
+}
+
+enum BrowserType {
+  CHROMIUM
+  FIREFOX
+  WEBKIT
+}
+
+enum ProfileStatus {
+  READY
+  ACTIVE
+  RUNNING
+  STOPPED
+  ERROR
+}
+
+// ─────────────────────────────────────────
+// Synthetic Test Users
+// ─────────────────────────────────────────
+model TestUser {
+  id          String         @id @default(uuid())
+  userId      String         @unique // USER-001, USER-002, ...
+  firstName   String
+  lastName    String
+  email       String         @unique
+  gender      String?
+  dateOfBirth DateTime?
+  phone       String?
+  username    String?
+  password    String?        // stored encrypted
+  location    String?
+  avatarUrl   String?
+  rawData     Json?          // raw API response
+  status      TestUserStatus @default(AVAILABLE)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  browserProfiles BrowserProfile[]
+  automationTasks AutomationTask[]
+
+  @@map("test_users")
+}
+
+enum TestUserStatus {
+  AVAILABLE
+  ASSIGNED
+  IN_USE
+  ARCHIVED
+}
+
+// ─────────────────────────────────────────
+// Test Scenarios
+// ─────────────────────────────────────────
+model TestScenario {
+  id            String          @id @default(uuid())
+  name          String
+  description   String?
+  targetUrl     String
+  environment   Environment     @default(STAGING)
+  authMethod    String?
+  timeout       Int             @default(30000)  // ms
+  retryCount    Int             @default(1)
+  isEnabled     Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  steps           TestStep[]
+  automationTasks AutomationTask[]
+
+  @@map("test_scenarios")
+}
+
+enum Environment {
+  DEVELOPMENT
+  STAGING
+  QA
+  SANDBOX
+  LOCALHOST
+}
+
+// ─────────────────────────────────────────
+// Test Steps (within a scenario)
+// ─────────────────────────────────────────
+model TestStep {
+  id             String       @id @default(uuid())
+  scenarioId     String
+  stepOrder      Int
+  action         StepAction
+  selector       String?      // CSS / XPath selector
+  value          String?      // input value / URL
+  expectedResult String?
+  timeout        Int?
+  description    String?
+
+  scenario TestScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  @@map("test_steps")
+}
+
+enum StepAction {
+  NAVIGATE
+  CLICK
+  FILL
+  SELECT
+  WAIT_FOR_ELEMENT
+  WAIT_FOR_URL
+  ASSERT_TEXT
+  ASSERT_VISIBLE
+  ASSERT_URL
+  SCREENSHOT
+  SCROLL
+  HOVER
+  PRESS_KEY
+  EVALUATE
+}
+
+// ─────────────────────────────────────────
+// Automation Tasks
+// ─────────────────────────────────────────
+model AutomationTask {
+  id         String     @id @default(uuid())
+  taskId     String     @unique // TASK-001, TASK-002, ...
+  profileId  String
+  testUserId String?
+  scenarioId String
+  createdBy  String?
+  status     TaskStatus @default(PENDING)
+  priority   Int        @default(0)
+  startedAt  DateTime?
+  finishedAt DateTime?
+  errorMsg   String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  profile  BrowserProfile @relation(fields: [profileId], references: [id])
+  testUser TestUser?      @relation(fields: [testUserId], references: [id])
+  scenario TestScenario   @relation(fields: [scenarioId], references: [id])
+  creator  User?          @relation(fields: [createdBy], references: [id])
+
+  testRuns TestRun[]
+
+  @@map("automation_tasks")
+}
+
+enum TaskStatus {
+  PENDING
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  STOPPED
+  CANCELLED
+  PAUSED
+}
+
+// ─────────────────────────────────────────
+// Test Runs (each execution of a task)
+// ─────────────────────────────────────────
+model TestRun {
+  id          String    @id @default(uuid())
+  taskId      String
+  runNumber   Int       @default(1)
+  status      RunStatus @default(RUNNING)
+  totalSteps  Int       @default(0)
+  passedSteps Int       @default(0)
+  failedSteps Int       @default(0)
+  duration    Float?    // seconds
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  summaryJson Json?
+
+  task        AutomationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  logs        TestLog[]
+  networkLogs NetworkLog[]
+  screenshots Screenshot[]
+
+  @@map("test_runs")
+}
+
+enum RunStatus {
+  RUNNING
+  PASSED
+  FAILED
+  ERROR
+  ABORTED
+}
+
+// ─────────────────────────────────────────
+// Test Logs
+// ─────────────────────────────────────────
+model TestLog {
+  id        String   @id @default(uuid())
+  runId     String
+  level     LogLevel @default(INFO)
+  source    LogSource @default(APP)
+  message   String
+  stepOrder Int?
+  timestamp DateTime @default(now())
+
+  run TestRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@map("test_logs")
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+enum LogSource {
+  APP
+  BROWSER
+  CONSOLE
+  NETWORK
+  STEP
+}
+
+// ─────────────────────────────────────────
+// Network Logs
+// ─────────────────────────────────────────
+model NetworkLog {
+  id           String   @id @default(uuid())
+  runId        String
+  method       String
+  url          String
+  statusCode   Int?
+  requestBody  String?
+  responseBody String?
+  duration     Float?
+  isError      Boolean  @default(false)
+  timestamp    DateTime @default(now())
+
+  run TestRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@map("network_logs")
+}
+
+// ─────────────────────────────────────────
+// Screenshots
+// ─────────────────────────────────────────
+model Screenshot {
+  id          String   @id @default(uuid())
+  runId       String
+  filename    String
+  path        String
+  type        ScreenshotType @default(MANUAL)
+  stepOrder   Int?
+  description String?
+  takenAt     DateTime @default(now())
+
+  run TestRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@map("screenshots")
+}
+
+enum ScreenshotType {
+  SUCCESS
+  FAILURE
+  MANUAL
+  STEP
+}
