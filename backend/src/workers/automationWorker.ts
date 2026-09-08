@@ -337,7 +337,7 @@ async function executeStep(
       if (selector) {
         await page.locator(selector).scrollIntoViewIfNeeded({ timeout });
       } else {
-        await page.evaluate(() => window.scrollBy(0, 500));
+        await page.evaluate(() => (window as Window & typeof globalThis).scrollBy(0, 500));
       }
       break;
 
