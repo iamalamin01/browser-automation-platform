@@ -1,7 +1,4 @@
 import { Queue } from 'bullmq';
-import { createBullBoard as initBullBoard } from '@bull-board/api';
-import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
-import { ExpressAdapter } from '@bull-board/express';
 import redis from './redis';
 
 export const AUTOMATION_QUEUE_NAME = 'automation';
@@ -16,14 +13,10 @@ export const automationQueue = new Queue(AUTOMATION_QUEUE_NAME, {
   },
 });
 
-export const serverAdapter = new ExpressAdapter();
-serverAdapter.setBasePath('/admin/queues');
-
+// Bull Board setup (optional UI) - called from index.ts
 export function createBullBoard() {
-  initBullBoard({
-    queues: [new BullMQAdapter(automationQueue)],
-    serverAdapter,
-  });
+  // Bull board UI disabled to avoid version compatibility issues
+  // Queue is still fully functional
 }
 
 export default automationQueue;
